@@ -62,8 +62,8 @@ namespace
         wvlog << "nFib=" << nFib << std::endl;
 
         wordDocument->seek(28, SEEK_CUR);
-
-        //U16 nCsw = wordDocument->readU16();
+	// uncomment below line solve the SEGSEGV fault on some doc files
+        U16 nCsw = wordDocument->readU16();
 
         /*  move FibRgW97 */
         wordDocument->seek(30, SEEK_CUR);
