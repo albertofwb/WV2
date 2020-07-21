@@ -25,6 +25,7 @@
 #include <stdio.h>
 
 using namespace wvWare;
+using namespace std;
 
 namespace
 {
@@ -53,72 +54,51 @@ namespace
             delete storage;
             return 0;
         }
-
-        U16 magic = wordDocument->readU16();
+        // the rest code of this method is copied from 
+        // https://github.com/KDE/koffice/blob/64fb4d222ca194c74a62d0bc7922ae568c82256c/filters/kword/msword-odf/wv2/src/parserfactory.cpp
+	    U16 magic = wordDocument->readU16();
         if ( magic != 0xa5ec && magic != 0xa5dc )
-            wvlog << "+++ Attention: Strange magic number: " << magic << std::endl;
+            wvlog << "+++ Attention: Strange magic number: " << magic << endl;
 
         U16 nFib = wordDocument->readU16();
-        wvlog << "nFib=" << nFib << std::endl;
-
-        wordDocument->seek(28, SEEK_CUR);
-	// uncomment below line solve the SEGSEGV fault on some doc files
-        U16 nCsw = wordDocument->readU16();
-
-        /*  move FibRgW97 */
-        wordDocument->seek(30, SEEK_CUR);
-
-        U16 nCslw = wordDocument->readU16();
-
-        /*  fibRgLw */
-        wordDocument->seek(nCslw * 4, SEEK_CUR);
-
-        U16 ncbRgFcLcb = wordDocument->readU16();
-
-        wordDocument->seek(ncbRgFcLcb * 8, SEEK_CUR);
-
-        U16 ncswNew = wordDocument->readU16();
-        U16 nfibnew = 0;
-        if (ncswNew) {
-            nfibnew = wordDocument->readU16();
-            if (nfibnew != Word2003 || nfibnew != Word2000 || nfibnew != Word2002 || nfibnew != Word2007) {
-                delete wordDocument;
-                delete storage;
-               }
-        } else {
-            nFib = Word8nFib;
-        }
-
         wordDocument->seek( 0 );  // rewind the stream
 
-        if (nfibnew) {
+        if ( nFib < 101 ) {
+            std::cerr << "+++ Don't know how to handle nFib=" << nFib << endl;
             delete wordDocument;
             delete storage;
             return 0;
-        } else  {
-            if ( nFib < 101 ) {
-                std::cerr << "+++ Don't know how to handle nFib=" << nFib << std::endl;
-                delete wordDocument;
-                delete storage;
-                return 0;
+        }
+        else if ( nFib == 101 ) {
+            wvlog << "Word 6 document found" << endl;
+            return new Parser95( storage, wordDocument );
+        }
+        else if ( nFib == 103 || nFib == 104 ) {
+            wvlog << "Word 7 (aka Word 95) document found" << endl;
+            return new Parser95( storage, wordDocument );
+        }
+        else if ( nFib == Word8nFib ) {  // Word8nFib == 193
+            wvlog << "Word 8 (aka Word 97) document found" << endl;
+            return new Parser97( storage, wordDocument );
+        }
+        else {
+            if ( nFib == 217 ) {
+                wvlog << "Looks like document was created with Word 9/Office 2000"
+                    << ", trying with the Word 8 parser." << endl;
             }
-            else if ( nFib == 101 ) {
-                wvlog << "Word 6 document found" << std::endl;
-                return new Parser95( storage, wordDocument );
+            else if ( nFib == 257 ) {
+                wvlog << "Looks like document was created with Word 10/Office XP"
+                    << ", trying with the Word 8 parser." << endl;
             }
-            else if ( nFib == 103 || nFib == 104 ) {
-                wvlog << "Word 7 (aka Word 95) document found" << std::endl;
-                return new Parser95( storage, wordDocument );
-            }
-            else if ( nFib == Word8nFib ) {  // Word8nFib == 193
-                wvlog << "Word 8 (aka Word 97) document found" << std::endl;
-                return new Parser97( storage, wordDocument );
+            else if ( nFib == 268 ) {
+                wvlog << "Looks like document was created with Word 11/Office 2003"
+                    << ", trying with the Word 8 parser." << endl;
             }
             else {
-                wvlog << "A document newer than Word 8 found (nFib=" << nFib
-                    << "), trying with the Word 8 parser" << std::endl;
-                return new Parser97( storage, wordDocument );
+            wvlog << "A document newer than Word 8 found"
+                  << ", trying with the Word 8 parser" << endl;
             }
+            return new Parser97( storage, wordDocument );
         }
     }
 }
